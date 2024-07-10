@@ -1,20 +1,17 @@
-//LoginScreen.js
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Image } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { auth } from '../Firebase';
 
-const LoginScreen = ({ navigation }) => {
+const LandingScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      console.log(authUser);
       if (authUser) {
         navigation.replace('Home');
-        console.log('User Login');
       }
     });
     return unsubscribe;
@@ -23,7 +20,7 @@ const LoginScreen = ({ navigation }) => {
   const signIn = () => {
     auth
       .signInWithEmailAndPassword(email, password)
-      .catch((error) => alert(error));
+      .catch((error) => alert(error.message));
   };
 
   return (
@@ -56,8 +53,6 @@ const LoginScreen = ({ navigation }) => {
     </KeyboardAvoidingView>
   );
 };
-
-export default LoginScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -118,4 +113,4 @@ const styles = StyleSheet.create({
   },
 });
 
-
+export default LandingScreen;

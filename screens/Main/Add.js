@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Image, TextInput, FlatList } from 'react-native';
 import { Camera } from 'expo-camera';
 import { FontAwesome } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { db, storage, auth } from './../../Firebase';
 
-export default function App() {
+export default function AddScreen() {
   const [hasGalleryPermission, setHasGalleryPermission] = useState(null);
   const [hasCameraPermission, setHasCameraPermission] = useState(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [type, setType] = useState(Camera.Constants.Type.back);
   const [image, setImage] = useState(null);
+  const [allowedUsers, setAllowedUsers] = useState('');
+  const [users, setUsers] = useState([]);
   const cameraRef = useRef(null);
 
   useEffect(() => {
@@ -20,6 +23,13 @@ export default function App() {
       const galleryStatus = await ImagePicker.requestMediaLibraryPermissionsAsync();
       setHasGalleryPermission(galleryStatus.status === 'granted');
     })();
+
+    const fetchUsers = async () => {
+      const usersCollection = await db.collection('users').get();
+      setUsers(usersCollection.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    };
+
+    fetchUsers();
   }, []);
 
   const flipCamera = () => {
@@ -49,6 +59,29 @@ export default function App() {
 
   const retakePicture = () => {
     setImage(null);
+  };
+
+  const uploadImage = async () => {
+    if (image) {
+      const response = await fetch(image);
+      const blob = await response.blob();
+      const filename = image.substring(image.lastIndexOf('/') + 1);
+      const ref = storage.ref().child(`images/${auth.currentUser.uid}/${filename}`);
+      const snapshot = await ref.put(blob);
+      const downloadURL = await snapshot.ref.getDownloadURL();
+
+      const allowedUserIds = allowedUsers.split(',').map(uid => uid.trim());
+
+      await db.collection('posts').add({
+        imageUrl: downloadURL,
+        userId: auth.currentUser.uid,
+        allowedUsers: allowedUserIds,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      setImage(null);
+      setAllowedUsers('');
+    }
   };
 
   if (hasCameraPermission === null || hasGalleryPermission === null) {
@@ -86,9 +119,25 @@ export default function App() {
       {image && (
         <View style={styles.previewContainer}>
           <Image source={{ uri: image }} style={styles.previewImage} />
+          <TextInput
+            style={styles.input}
+            placeholder="Allowed users (comma-separated UIDs)"
+            value={allowedUsers}
+            onChangeText={setAllowedUsers}
+          />
+          <FlatList
+            data={users}
+            renderItem={({ item }) => (
+              <Text>{item.email}</Text>
+            )}
+            keyExtractor={item => item.id}
+          />
           <View style={styles.previewButtonsContainer}>
             <TouchableOpacity style={styles.previewButton} onPress={retakePicture}>
               <Text style={styles.previewButtonText}>Retake</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.previewButton} onPress={uploadImage}>
+              <Text style={styles.previewButtonText}>Upload</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -170,5 +219,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  input: {
+    height: 50,
+    width: '80%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#BDBDBD',
+    borderRadius: 10,
+    marginVertical: 10,
+    fontSize: 16,
+    color: '#fff',
+  },
 });
-
